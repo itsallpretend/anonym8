@@ -50,7 +50,7 @@ function notify {
 function change_hostname {
 	cp /etc/hostname /etc/hostname.bak
 	cp /etc/hosts /etc/hosts.bak
-	sudo service network-manager stop
+	sudo service NetworkManager stop
 	CURRENT_HOSTNAME=$(hostname)
 	dhclient -r
 	rm -f /var/lib/dhcp/dhclient*
@@ -63,7 +63,7 @@ function change_hostname {
 		su "$SUDO_USER" -c "xauth add $(xauth -n list | tail -1 | sed 's/^.*\//'$NEW_HOSTNAME'\//g')"
 		echo " * X authority file updated"
 	fi
-	sudo service network-manager start
+	sudo service NetworkManager start
 	sleep 5
 	echo -e -n "\n$GREEN*$BLUE New Hostname: $GREEN"
 	hostname
@@ -72,7 +72,7 @@ function change_hostname {
 
 # restore ####
 function restore_hostname {
-	sudo service network-manager stop
+	sudo service NetworkManager stop
 	dhclient -r
 	rm -f /var/lib/dhcp/dhclient*
 	if [ -e /etc/hostname.bak ]; then
@@ -83,7 +83,7 @@ function restore_hostname {
 		rm /etc/hosts
 		cp /etc/hosts.bak /etc/hosts
 	fi
-	sudo service network-manager start
+	sudo service NetworkManager start
 	sleep 5
 	echo -e -n "\n$GREEN*$BLUE Restored Hostname: $GREEN"
 	hostname 
@@ -182,7 +182,7 @@ function status_polipo {
 # START ####
 function start_mac {
 	echo -e "\n$GREEN*$BLUE Spoofing Mac Address...\n"
-	sudo service network-manager stop
+	sudo service NetworkManager stop
 	sleep 1
 	echo -e "$GREEN*$BLUE wlan0 MAC address:\n"$GREEN
 	sleep 1
@@ -192,7 +192,7 @@ function start_mac {
 	sleep 1
 	sudo ifconfig wlan0 up
 	sleep 1
-	sudo service network-manager start
+	sudo service NetworkManager start
 	echo -e "\n$GREEN*$BLUE Mac Address Spoofing$GREEN [ON]"$RESETCOLOR
 	sleep 1
 	notify "Mac Address Spoofing ON" 
@@ -201,7 +201,7 @@ function start_mac {
 # STOP ####
 function stop_mac {
 	echo -e "\n$GREEN*$BLUE Restoring Mac Address...\n"
-	sudo service network-manager stop
+	sudo service NetworkManager stop
 	sleep 1
 	echo -e "$GREEN*$BLUE wlan0 MAC address:\n"$GREEN	
 	sleep 1
@@ -211,7 +211,7 @@ function stop_mac {
 	sleep 1
 	sudo ifconfig wlan0 up
 	sleep 1
-	sudo service network-manager start
+	sudo service NetworkManager start
 	sleep 1
 	echo -e "\n$GREEN*$BLUE Mac Address Spoofing$RED [OFF]"$RESETCOLOR
 	sleep 1
