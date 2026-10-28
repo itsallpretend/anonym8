@@ -17,14 +17,17 @@ Script requirements are:
 -macchanger 
 -resolvconf 
 -dnsmasq    
--polipo     
 -privoxy           
--arm        
+-nyx (formerly "arm"; INSTALL.sh falls back to arm if nyx isn't packaged for your distro)
 -libnotify  
 -curl
 -bleachbit
 
 they'll be automatically installed.
+
+Note: polipo is optional and no longer packaged on current Debian/Ubuntu/Kali
+releases. INSTALL.sh still tries to install it and skips it gracefully if
+unavailable, since anonym8 supports it if present on your system.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -80,12 +83,15 @@ Pour le bon fonctionnement du script, les paquets suivants seront automatiquemen
 -macchanger
 -resolvconf
 -dnsmasq    
--polipo     
 -privoxy           
--arm        
+-nyx (anciennement "arm"; INSTALL.sh utilise arm en secours si nyx n'est pas disponible)
 -libnotify  
 -curl
 -bleachbit
+
+Note: polipo est optionnel et n'est plus disponible dans les dépôts actuels de
+Debian/Ubuntu/Kali. INSTALL.sh tente quand même de l'installer et continue sans
+bloquer s'il est indisponible, car anonym8 le prend en charge s'il est présent.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

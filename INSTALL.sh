@@ -20,9 +20,22 @@
 	sleep 1
 	cp -Rf usr/anOFF /usr/bin/anOFF
 	sleep 1
-	apt-get install tor macchanger resolvconf dnsmasq polipo privoxy tor-arm libnotify-bin curl bleachbit
+	apt-get update
+	# Core packages required by anonym8; abort the install if any of these fail.
+	apt-get install -y tor macchanger resolvconf dnsmasq privoxy libnotify-bin curl bleachbit
 	sleep 1
-	cp -Rf polipo/config /etc/polipo/config
+	# 'nyx' replaced the abandoned 'arm' relay monitor; prefer it, but fall back
+	# to 'arm' for older distros that still carry it.
+	apt-get install -y nyx || apt-get install -y arm || echo -e "$RED[!]$RESETCOLOR Neither nyx nor arm is available in your repos; the relay monitor feature will not work."
+	sleep 1
+	# 'polipo' has been dropped from current Debian/Ubuntu/Kali repos, but keep
+	# trying to install it since anonym8 still supports it if present.
+	if apt-get install -y polipo; then
+		mkdir -p /etc/polipo
+		cp -Rf polipo/config /etc/polipo/config
+	else
+		echo -e "$RED[!]$RESETCOLOR polipo is not available in your repos; the polipo feature will not work."
+	fi
 	sleep 1
 	cp -Rf privoxy/config /etc/privoxy/config
 	sleep 1

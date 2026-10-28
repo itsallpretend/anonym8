@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # This code is based on anonsurf by #ParrotSec & AnonSecTunnel by cysec666 #AnonSec
-# implementing TOR, I2P, Privoxy, Polipo, arm-tor and MacChanger for a simple and better privacy and security.
+# implementing TOR, I2P, Privoxy, Polipo, nyx (formerly arm) and MacChanger for a simple and better privacy and security.
 
 # Coded by Hiroshiman
 # Twitter: @HiroshimanRise
 
 ### BEGIN INIT INFO
 # Provides: Anonym8
-# Short-Description: Transparent Proxy through TOR, I2P, Privoxy, Polipo + arm-tor and MacChanger features
+# Short-Description: Transparent Proxy through TOR, I2P, Privoxy, Polipo + nyx and MacChanger features
 ### END INIT INFO
 
 # Thanks to:
@@ -23,24 +23,45 @@ export BLUE='\033[1;94m'
 export GREEN='\033[1;92m'
 export RED='\033[1;91m'
 export RESETCOLOR='\033[1;00m'
-export notify
 
 # Destinations you don't want routed through Tor
 TOR_EXCLUDE="192.168.0.0/16 172.16.0.0/12 10.0.0.0/8"
 
-# The UID Tor runs as
-# change it if, starting tor, the command 'ps -e | grep tor' returns a different UID
-TOR_UID="debian-tor"
+# The UID Tor runs as.
+# Debian/Ubuntu/Kali/Parrot run Tor as the dedicated "debian-tor" system user.
+# Fall back to the "tor" user (Arch/Fedora/etc.), then to scanning the process
+# table, in case 'id -u debian-tor'/'id -u tor' returns nothing on your distro.
+function get_tor_uid() {
+	if id -u debian-tor &> /dev/null; then
+		id -u debian-tor
+	elif id -u tor &> /dev/null; then
+		id -u tor
+	else
+		ps -e -o uid=,comm= | awk '$2 == "tor" {print $1; exit}'
+	fi
+}
+TOR_UID=$(get_tor_uid)
+
+if [ -z "$TOR_UID" ]; then
+	echo -e "\n$GREEN[$RED!$GREEN]$RED Unable to determine the UID Tor runs as.$RESETCOLOR" >&2
+	echo -e "$RED    Make sure Tor is installed, or hardcode TOR_UID in this script.$RESETCOLOR" >&2
+	exit 1
+fi
 
 # Tor's TransPort
 TOR_PORT="9040"
 
+# Wireless interface used by the macchanger features.
+# Override at runtime if your interface isn't wlan0, e.g.:
+#   WIFI_IFACE=wlp3s0 anonym8 start_mac
+WIFI_IFACE="${WIFI_IFACE:-wlan0}"
+
 ### FUNCTIONS ####
 
 ## notify ####
-function notify {
-	if [ -e /usr/bin/notify-send ]; then
-		/usr/bin/notify-send "anonym8" "$1"
+function notify_user {
+	if command -v notify-send &> /dev/null; then
+		notify-send "anonym8" "$1"
 	fi
 }
 
@@ -54,7 +75,17 @@ function change_hostname {
 	CURRENT_HOSTNAME=$(hostname)
 	dhclient -r
 	rm -f /var/lib/dhcp/dhclient*
-	RANDOM_HOSTNAME=$(shuf -n 1 /etc/dictionaries-common/words | sed -r 's/[^a-zA-Z]//g' | awk '{print tolower($0)}')
+	if [ -r /etc/dictionaries-common/words ]; then
+		WORDLIST=/etc/dictionaries-common/words
+	elif [ -r /usr/share/dict/words ]; then
+		WORDLIST=/usr/share/dict/words
+	fi
+	if [ -n "$WORDLIST" ]; then
+		RANDOM_HOSTNAME=$(shuf -n 1 "$WORDLIST" | sed -r 's/[^a-zA-Z]//g' | awk '{print tolower($0)}')
+	else
+		# No dictionary package (e.g. wamerican) installed; fall back to a random string
+		RANDOM_HOSTNAME=$(tr -dc 'a-z' < /dev/urandom 2> /dev/null | head -c 8)
+	fi
 	NEW_HOSTNAME=${1:-$RANDOM_HOSTNAME}
 	echo "$NEW_HOSTNAME" > /etc/hostname
 	sed -i 's/127.0.1.1.*/127.0.1.1\t'"$NEW_HOSTNAME"'/g' /etc/hosts
@@ -67,7 +98,7 @@ function change_hostname {
 	sleep 5
 	echo -e -n "\n$GREEN*$BLUE New Hostname: $GREEN"
 	hostname
-	notify "hostname spoofed"
+	notify_user "hostname spoofed"
 }
 
 # restore ####
@@ -87,7 +118,7 @@ function restore_hostname {
 	sleep 5
 	echo -e -n "\n$GREEN*$BLUE Restored Hostname: $GREEN"
 	hostname 
-	notify "hostname restored"
+	notify_user "hostname restored"
 }
 
 # status ####
@@ -103,15 +134,26 @@ function wipe {
 	swapoff -a && swapon -a
 	sleep 1
 	echo -e "$GREEN*$BLUE Cache, ram & swap-space$GREEN [CLEANED]"$RESETCOLOR
-	notify "Cache, ram & swap-space cleaned!"
+	notify_user "Cache, ram & swap-space cleaned!"
 }
 
 ## ARM ####
 function start_arm {
-	echo -e "\n$GREEN*$BLUE Starting Anonymizing Relay Monitor (arm)..."$RESETCOLOR
+	# 'arm' was deprecated upstream in favor of 'nyx' (same author, still maintained);
+	# prefer nyx if it's installed, and fall back to arm for older systems.
+	if command -v nyx &> /dev/null; then
+		MONITOR_CMD=nyx
+	else
+		MONITOR_CMD=arm
+	fi
+	echo -e "\n$GREEN*$BLUE Starting Anonymizing Relay Monitor ($MONITOR_CMD)..."$RESETCOLOR
 	xhost +
 	sleep 1
-	DISPLAY=:0.0 gnome-terminal -e "sudo arm"
+	if command -v x-terminal-emulator &> /dev/null; then
+		DISPLAY=:0.0 x-terminal-emulator -e "sudo $MONITOR_CMD"
+	else
+		DISPLAY=:0.0 gnome-terminal -- sudo $MONITOR_CMD
+	fi
 	sleep 1
 }
 
@@ -124,7 +166,7 @@ function start_privoxy {
 	sudo service privoxy start
 	echo -e "$GREEN*$BLUE Privoxy Service$GREEN [ON]"$RESETCOLOR
 	sleep 1
-	notify "Privoxy daemon ON"
+	notify_user "Privoxy daemon ON"
 }
 
 # STOP ####
@@ -135,7 +177,7 @@ function stop_privoxy {
 	sleep 1
 	echo -e "$GREEN*$BLUE Privoxy Service$RED [OFF]"$RESETCOLOR
 	sleep 1
-	notify "Privoxy daemon OFF" 
+	notify_user "Privoxy daemon OFF" 
 }
 
 # STATUS ####
@@ -155,7 +197,7 @@ function start_polipo {
 	sudo service polipo start
 	echo -e "$GREEN*$BLUE Polipo Service$GREEN [ON]"$RESETCOLOR
 	sleep 1
-	notify "Polipo daemon ON" 
+	notify_user "Polipo daemon ON" 
 }
 
 # STOP ####
@@ -166,7 +208,7 @@ function stop_polipo {
 	sleep 1
 	echo -e "$GREEN*$BLUE Polipo Service$RED [OFF]"$RESETCOLOR
 	sleep 1
-	notify "Polipo daemon OFF"  
+	notify_user "Polipo daemon OFF"  
 }
 
 # STATUS ####
@@ -184,18 +226,18 @@ function start_mac {
 	echo -e "\n$GREEN*$BLUE Spoofing Mac Address...\n"
 	sudo service NetworkManager stop
 	sleep 1
-	echo -e "$GREEN*$BLUE wlan0 MAC address:\n"$GREEN
+	echo -e "$GREEN*$BLUE $WIFI_IFACE MAC address:\n"$GREEN
 	sleep 1
-	sudo ifconfig wlan0 down
+	sudo ip link set "$WIFI_IFACE" down
 	sleep 1
-	sudo macchanger -a wlan0
+	sudo macchanger -a "$WIFI_IFACE"
 	sleep 1
-	sudo ifconfig wlan0 up
+	sudo ip link set "$WIFI_IFACE" up
 	sleep 1
 	sudo service NetworkManager start
 	echo -e "\n$GREEN*$BLUE Mac Address Spoofing$GREEN [ON]"$RESETCOLOR
 	sleep 1
-	notify "Mac Address Spoofing ON" 
+	notify_user "Mac Address Spoofing ON" 
 }
 
 # STOP ####
@@ -203,28 +245,28 @@ function stop_mac {
 	echo -e "\n$GREEN*$BLUE Restoring Mac Address...\n"
 	sudo service NetworkManager stop
 	sleep 1
-	echo -e "$GREEN*$BLUE wlan0 MAC address:\n"$GREEN	
+	echo -e "$GREEN*$BLUE $WIFI_IFACE MAC address:\n"$GREEN	
 	sleep 1
-	sudo ifconfig wlan0 down
+	sudo ip link set "$WIFI_IFACE" down
 	sleep 1
-	sudo macchanger -p wlan0
+	sudo macchanger -p "$WIFI_IFACE"
 	sleep 1
-	sudo ifconfig wlan0 up
+	sudo ip link set "$WIFI_IFACE" up
 	sleep 1
 	sudo service NetworkManager start
 	sleep 1
 	echo -e "\n$GREEN*$BLUE Mac Address Spoofing$RED [OFF]"$RESETCOLOR
 	sleep 1
-	notify "Mac Address Spoofing OFF" 
+	notify_user "Mac Address Spoofing OFF" 
 }
 
 # STATUS ####
 function status_mac {
 	echo -e "\n$GREEN*$BLUE Mac Adress Status:\n"
 	sleep 1
-	echo -e "$GREEN*$BLUE wlan0 Mac Adress:\n"$GREEN
+	echo -e "$GREEN*$BLUE $WIFI_IFACE Mac Adress:\n"$GREEN
 	sleep 1
-	macchanger wlan0
+	macchanger "$WIFI_IFACE"
 	sleep 1
 }
 
@@ -244,7 +286,7 @@ function start_i2p {
 	sleep 1
 	echo -e "$GREEN*$BLUE I2P Service$GREEN [ON]"$RESETCOLOR
 	sleep 1
-	notify "I2P Daemon ON"  
+	notify_user "I2P Daemon ON"  
 }
 
 # STOP ####
@@ -259,7 +301,7 @@ function stop_i2p {
 	sleep 1
 	echo -e "\n$GREEN*$BLUE I2P Service$RED [OFF]"$RESETCOLOR
 	sleep 1
-	notify "I2P Daemon OFF" 
+	notify_user "I2P Daemon OFF" 
 }
 
 # STATUS ####
@@ -301,7 +343,7 @@ function start {
 	echo -e "$GREEN*$BLUE starting Tor...\n" >&2
 	sleep 1
 	service resolvconf stop
-	killall dnsmasq
+	killall -q dnsmasq
 	sleep 2
 	service tor start
 	sleep 6
@@ -361,7 +403,7 @@ function start {
 
 	echo -e "$GREEN*$BLUE Tor Tunneling$GREEN [ON]"$RESETCOLOR 
 	sleep 1
-	notify "Tor Tunneling ON"  
+	notify_user "Tor Tunneling ON"  
 }
 
 ## STOP ####
@@ -407,7 +449,7 @@ function stop {
 	sleep 3
 	echo -e "$GREEN*$BLUE Tor Tunneling$RED [OFF]"$RESETCOLOR 
 	sleep 1
-	notify "Tor Tunneling OFF"
+	notify_user "Tor Tunneling OFF"
 }
 
 ## CHANGE ####
@@ -424,7 +466,7 @@ function change {
 	sleep 1
 	curl ipinfo.io/
 	sleep 1
-	notify "Tor Relay Changed"  
+	notify_user "Tor Relay Changed"  
 }
 
 ## STATUS ####
@@ -534,7 +576,7 @@ case "$1" in
 	$RED anonym8 stop_mac$BLUE         =>$GREEN Stop macchanger services
 	$RED anonym8 status_mac$BLUE       =>$GREEN macchanger status\n
 	$BLUE----[ arm related features ]----
-	$RED anonym8 start_arm$BLUE        =>$GREEN Start Monitoring Anonymizing Relay (arm)\n
+	$RED anonym8 start_arm$BLUE        =>$GREEN Start Monitoring Anonymizing Relay (nyx/arm)\n
 	$BLUE----[ wipe related features ]----
 	$RED anonym8 wipe$BLUE             =>$GREEN cache, RAM & swap-space cleaner\n
 	$BLUE----[ hostname related features ]----
